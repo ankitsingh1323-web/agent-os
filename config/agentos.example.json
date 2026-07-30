@@ -1,0 +1,59 @@
+{
+  "_comment": "Example config. Copy to agentos.json and edit. Every field is optional; anything omitted uses the built-in code default. Load via build_default_os(config_path=...) or `python -m agentos --config ...`.",
+
+  "airgap": {
+    "enforce": true,
+    "allow_private_lan": true,
+    "extra_hosts": []
+  },
+
+  "concurrency": 4,
+
+  "models": [
+    {
+      "name": "kimi",
+      "model_id": "kimi-k2",
+      "backend": "auto",
+      "base_url": "http://localhost:11434/v1",
+      "context_window": 131072,
+      "params": { "temperature": 0.4, "max_tokens": 2048 },
+      "notes": "Moonshot Kimi — long-context planning/synthesis."
+    },
+    {
+      "name": "qwen",
+      "model_id": "qwen2.5:14b",
+      "backend": "auto",
+      "base_url": "http://localhost:11434/v1",
+      "context_window": 32768,
+      "params": { "temperature": 0.5, "max_tokens": 1536 },
+      "notes": "Alibaba Qwen — research/coding."
+    },
+    {
+      "name": "llama",
+      "model_id": "llama3.1:8b",
+      "backend": "auto",
+      "base_url": "http://localhost:11434/v1",
+      "context_window": 16384,
+      "params": { "temperature": 0.6, "max_tokens": 1024 },
+      "notes": "Meta Llama — review/critique."
+    },
+    {
+      "name": "grok",
+      "model_id": "grok-1",
+      "backend": "auto",
+      "base_url": "http://localhost:8000/v1",
+      "context_window": 8192,
+      "params": { "temperature": 0.5, "max_tokens": 1024 },
+      "notes": "xAI Grok-1 open weights (314B MoE) — needs a beefy host; often served via vLLM on :8000."
+    }
+  ],
+
+  "agent_models": {
+    "planner": "kimi",
+    "researcher": "qwen",
+    "coder": "qwen",
+    "reviewer": "llama",
+    "critic": "llama",
+    "summarizer": "kimi"
+  }
+}

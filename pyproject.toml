@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentos"
+version = "0.1.0"
+description = "An airgapped operating system for coordinating AI agents on local open-weight models (Kimi, Qwen, Llama, Grok)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+keywords = ["agents", "airgapped", "llm", "orchestration", "local", "offline"]
+# Core has NO runtime dependencies — it is standard-library only, by design,
+# so it installs and runs inside a real airgap.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+agentos = "agentos.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["agentos*"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
