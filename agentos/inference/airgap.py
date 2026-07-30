@@ -8,7 +8,10 @@ host). This module is the choke point that guarantees it. Backends call
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
+import socket
+import threading
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
@@ -67,3 +70,55 @@ def assert_local(url: str, policy: AirgapPolicy | None = None) -> None:
             "Only loopback/private endpoints are permitted. "
             "Point this at a local model runtime (Ollama, vLLM, llama.cpp)."
         )
+
+
+# --- process-level egress enforcement --------------------------------------
+# ``assert_local`` protects the sanctioned inference path, but an externally-built
+# agent might try its *own* network I/O and route around it. This guard closes
+# that hole: while active, every non-local IP socket connect in the process is
+# refused. That is what lets us run foreign agent code without breaking the airgap.
+
+_guard_lock = threading.Lock()
+_guard_depth = 0
+_orig_connect = None
+
+
+@contextlib.contextmanager
+def process_egress_guard(policy: AirgapPolicy | None = None):
+    """Block non-local socket connections for the duration of the block.
+
+    Reentrant and concurrency-safe: the rule (allow local, refuse the rest) is
+    uniform, so nested or concurrent guards compose. Local connections stay
+    allowed, so the kernel's own model calls keep working. Non-IP sockets
+    (e.g. AF_UNIX) are inherently local and pass through untouched.
+    """
+    global _guard_depth, _orig_connect
+    policy = policy or DEFAULT_POLICY
+    if not policy.enforce:
+        yield
+        return
+
+    with _guard_lock:
+        if _guard_depth == 0:
+            _orig_connect = socket.socket.connect
+
+            def _guarded_connect(self, address):
+                if self.family in (socket.AF_INET, socket.AF_INET6):
+                    host = address[0] if isinstance(address, tuple) else address
+                    if not policy.host_allowed(str(host)):
+                        raise AirgapViolation(
+                            f"Airgap: blocked egress to {host!r} from within an "
+                            "external agent. All I/O must go through kernel syscalls."
+                        )
+                return _orig_connect(self, address)
+
+            socket.socket.connect = _guarded_connect
+        _guard_depth += 1
+
+    try:
+        yield
+    finally:
+        with _guard_lock:
+            _guard_depth -= 1
+            if _guard_depth == 0 and _orig_connect is not None:
+                socket.socket.connect = _orig_connect

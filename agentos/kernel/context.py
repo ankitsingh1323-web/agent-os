@@ -23,6 +23,11 @@ class AgentContext:
         self.agent = agent
         self.working = WorkingMemory(task_id=task.id)
 
+    @property
+    def airgap_policy(self):
+        """The active airgap policy — used by adapters to enforce no self-I/O."""
+        return self._kernel.models.policy
+
     # --- inference ---------------------------------------------------------
     async def infer(
         self,

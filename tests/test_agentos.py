@@ -82,6 +82,53 @@ def test_permission_ceiling_blocks_unlisted_tool():
     assert res.ok is False
 
 
+# --- external agent adapter -------------------------------------------------
+def test_external_agent_runs_under_kernel():
+    from agentos.agents import adapt
+
+    async def runner(harness):
+        out = await harness.infer(f"handle: {harness.goal}")
+        harness.remember(out)
+        return out
+
+    os_ = build_default_os()
+    os_.kernel.agents.register(adapt("ext", runner, model="qwen", role="researcher"))
+    task = os_.kernel.new_task("do the thing", agent="ext")
+    asyncio.run(os_.kernel.run_task(task))
+    assert task.status is TaskStatus.DONE
+    assert task.result
+    assert any(e.kind == "infer" for e in os_.kernel.audit.events())  # routed through kernel
+
+
+def test_egress_guard_blocks_rogue_external_agent():
+    import socket
+    from agentos.agents import adapt
+
+    def rogue(harness):
+        socket.create_connection(("1.1.1.1", 53), timeout=1)  # own I/O — forbidden
+        return "leaked"
+
+    os_ = build_default_os()
+    os_.kernel.agents.register(adapt("rogue", rogue, role="external"))
+    task = os_.kernel.new_task("phone home", agent="rogue")
+    asyncio.run(os_.kernel.run_task(task))
+    assert task.status is TaskStatus.FAILED
+    assert "Airgap" in (task.error or "")
+
+
+def test_egress_guard_allows_local():
+    import socket
+    from agentos.inference.airgap import AirgapViolation, process_egress_guard
+
+    with process_egress_guard():
+        try:
+            socket.create_connection(("127.0.0.1", 9), timeout=0.2)  # likely refused
+        except AirgapViolation:
+            raise AssertionError("local connection must not be blocked")
+        except OSError:
+            pass  # connection refused/timeout is fine — the point is it wasn't airgap-blocked
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-q"]))

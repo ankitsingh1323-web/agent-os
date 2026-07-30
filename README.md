@@ -75,6 +75,34 @@ regardless.
 
 Re-bind any agent to any model in config — no code changes.
 
+## Integrating externally-built agents
+
+The OS uses a **narrow-waist** contract: a thin, mandatory interface at the
+boundary, total freedom behind it. An agent built any other way — LangChain,
+AutoGen, CrewAI, a raw prompt loop — runs under the kernel by writing a small
+runner against the **harness** (the framework-agnostic "syscall SDK"). Its model
+calls, tools and memory all flow through the kernel, so the airgap, audit trail
+and permissions still hold.
+
+```python
+from agentos import build_default_os
+from agentos.agents import adapt
+
+async def my_runner(harness):            # the entire integration surface
+    findings = await harness.infer(f"Research: {harness.goal}")   # sanctioned model path
+    harness.remember(findings)
+    return findings
+
+os_ = build_default_os()
+os_.kernel.agents.register(adapt("field-researcher", my_runner, model="qwen",
+                                 role="researcher", capabilities=["research"]))
+```
+
+The one iron rule — **no agent performs its own I/O** — is *enforced*, not
+trusted: foreign runners execute inside a process egress guard, so any attempt at
+non-local network access is refused at the socket. See
+`examples/external_agent_demo.py` (a foreign agent runs; a rogue one is blocked).
+
 ## Airgap guarantee
 
 Every backend calls `assert_local()` before opening a socket. Non-loopback /
