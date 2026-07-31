@@ -36,6 +36,9 @@ class ModelProfile:
     def build(self, policy: AirgapPolicy | None = None) -> Backend:
         if self.backend == "stub":
             return StubBackend()
+        if self.backend == "nano":
+            from agentos.inference.nanolm import NanoLMBackend
+            return NanoLMBackend()
         local = LocalOpenAIBackend(base_url=self.base_url, policy=policy)
         if self.backend == "local-openai":
             return local

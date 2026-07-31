@@ -40,7 +40,32 @@ print(report.answer)
 print(report.trace())   # full plan → execute → review → summarize trace
 ```
 
-## Running on real local models
+## Run on a real model right now (no downloads)
+
+The OS ships a real, self-contained model — **NanoLM**, a trained-at-startup
+n-gram LM with genuine temperature/top-p sampling, pure stdlib, CPU-only. It runs
+inside a true airgap with nothing to install, and it serves the **same
+OpenAI-compatible API** as the production runtimes.
+
+```bash
+# in-process real model (no server): pick the "nano" backend
+python -c "import asyncio; from agentos import build_default_os; from agentos.inference.registry import ModelProfile as P; \
+os=build_default_os(); [os.kernel.models.register(P(name=n, model_id='nano', backend='nano')) for n in os.kernel.models.names()]; \
+print(asyncio.run(os.run('Design a nightly backup plan')).answer)"
+
+# or serve it over HTTP and let the OS discover it, exactly like Ollama:
+python -m agentos.inference.server        # NanoLM on 127.0.0.1:11434
+python -m agentos run "Design a nightly backup plan"   # auto-detects the server
+
+# full socket → HTTP → kernel → model demo:
+python examples/local_model_demo.py
+```
+
+NanoLM is a compact *reference* model that proves the OS runs on locally computed
+inference — not a replacement for the big open-weight models. Those plug into the
+identical path below.
+
+## Running on real production models
 
 Serve the open-weight models with any OpenAI-compatible local runtime and the OS
 will use them automatically (the `auto` backend probes `localhost` and falls back
